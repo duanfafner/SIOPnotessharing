@@ -31,7 +31,7 @@ function sbFetch(path, opts = {}) {
 let SESSIONS = [];
 let NOTES = [];
 let selectedSession = null;
-let selectedFile = null;
+let selectedFiles = [];
 
 // ── Init ─────────────────────────────────────
 async function init() {
@@ -189,21 +189,46 @@ function setSelectedFile(file) {
     showFeedback('error', 'Unsupported file type. Please upload PDF, image, or Word files.');
     return;
   }
+  if (selectedFiles.some((f) => f.name === file.name && f.size === file.size && f.lastModified === file.lastModified)) {
+    return;
+  }
+  selectedFiles.push(file);
+  renderFilePreview();
+}
 
-  selectedFile = file;
+function renderFilePreview() {
   const prev = document.getElementById('file-prev');
+  if (!selectedFiles.length) {
+    prev.classList.add('hidden');
+    prev.innerHTML = '';
+    return;
+  }
+
   prev.classList.remove('hidden');
   prev.innerHTML = `
+    <div class="file-count-pill">${selectedFiles.length} file${selectedFiles.length === 1 ? '' : 's'} selected</div>
+    ${selectedFiles.map(
+      (file, idx) => `
     <div class="file-card">
-      <span class="fname">📎 ${selectedFile.name}</span>
-      <button id="remove-file">Remove</button>
-    </div>`;
-  document.getElementById('remove-file').addEventListener('click', clearFile);
+      <span class="fname">📎 ${file.name}</span>
+      <button class="remove-file" data-idx="${idx}">Remove</button>
+    </div>`
+    ).join('')}
+  `;
+
+  prev.querySelectorAll('.remove-file').forEach((btn) => {
+    btn.addEventListener('click', () => {
+      const i = Number(btn.dataset.idx);
+      selectedFiles.splice(i, 1);
+      renderFilePreview();
+    });
+  });
 }
 
 function handleFile(input) {
   if (!input.files.length) return;
-  setSelectedFile(input.files[0]);
+  Array.from(input.files).forEach((f) => setSelectedFile(f));
+  input.value = '';
 }
 
 function onDragOverZone(e) {
@@ -226,15 +251,13 @@ function onDropFile(e) {
 
   const files = e.dataTransfer?.files;
   if (!files || !files.length) return;
-
-  const file = files[0];
-  setSelectedFile(file);
+  Array.from(files).forEach((f) => setSelectedFile(f));
 }
 
 function clearFile() {
-  selectedFile = null;
+  selectedFiles = [];
   document.getElementById('file-input').value = '';
-  document.getElementById('file-prev').classList.add('hidden');
+  renderFilePreview();
 }
 
 // ── Submit note ──────────────────────────────
@@ -242,42 +265,60 @@ async function submitNote() {
   const text = document.getElementById('note-text').value.trim();
 
   if (!selectedSession) { showFeedback('error', 'Please select a session first.'); return; }
-  if (!text && !selectedFile) { showFeedback('error', 'Please add some notes or attach a file.'); return; }
+  if (!text && !selectedFiles.length) { showFeedback('error', 'Please add some notes or attach a file.'); return; }
 
   const btn = document.getElementById('submit-btn');
   btn.disabled = true;
   showFeedback('loading', 'Reviewing and saving your submission...');
 
   try {
-    // 1. Upload file if present
-    let fileUrl = null, fileName = null, fileType = null;
-    if (selectedFile) {
-      const upload = await uploadFile(selectedFile);
-      if (upload) {
-        fileUrl = upload.url;
-        fileName = upload.name;
-        fileType = upload.type;
+    // 1. Build submission payloads (one note per attached file; text on first one)
+    const submissions = [];
+    if (selectedFiles.length) {
+      for (let i = 0; i < selectedFiles.length; i++) {
+        const file = selectedFiles[i];
+        const upload = await uploadFile(file);
+        if (!upload) {
+          showFeedback('error', `Upload failed for ${file.name}. Please try again.`);
+          btn.disabled = false;
+          return;
+        }
+        submissions.push({
+          text: i === 0 ? text : '',
+          fileUrl: upload.url,
+          fileName: upload.name,
+          fileType: upload.type,
+        });
       }
+    } else {
+      submissions.push({
+        text,
+        fileUrl: null,
+        fileName: null,
+        fileType: null,
+      });
     }
 
-    // 2. Submit through server-side moderation route
-    const submitRes = await fetch('/api/submit-note', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        sessionId: selectedSession.session_id,
-        text,
-        fileUrl,
-        fileName,
-        fileType,
-      }),
-    });
-    const submitData = await submitRes.json().catch(() => ({}));
-    if (!submitRes.ok || submitData?.pass === false) {
-      const reason = submitData?.reason || submitData?.error || 'Submission failed moderation.';
-      showFeedback('error', `Submission not accepted: ${reason}`);
-      btn.disabled = false;
-      return;
+    // 2. Submit each payload through server-side moderation route
+    for (const item of submissions) {
+      const submitRes = await fetch('/api/submit-note', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          sessionId: selectedSession.session_id,
+          text: item.text,
+          fileUrl: item.fileUrl,
+          fileName: item.fileName,
+          fileType: item.fileType,
+        }),
+      });
+      const submitData = await submitRes.json().catch(() => ({}));
+      if (!submitRes.ok || submitData?.pass === false) {
+        const reason = submitData?.reason || submitData?.error || 'Submission failed moderation.';
+        showFeedback('error', `Submission not accepted: ${reason}`);
+        btn.disabled = false;
+        return;
+      }
     }
 
     // 4. Reset form

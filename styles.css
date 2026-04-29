@@ -344,6 +344,19 @@ textarea {
   margin-top: 0.5rem;
 }
 
+.file-count-pill {
+  display: inline-flex;
+  align-items: center;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--color-text);
+  background: var(--color-surface-2);
+  border: 0.5px solid var(--color-border);
+  border-radius: 999px;
+  padding: 4px 10px;
+  margin: 0.25rem 0 0.35rem;
+}
+
 .file-card .fname {
   font-size: 13px;
   font-weight: 500;
