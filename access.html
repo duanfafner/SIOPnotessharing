@@ -31,6 +31,16 @@
       color: #555;
       font-size: 14px;
     }
+    .hint {
+      background: #eef3ff;
+      border: 1px solid #c8d6ff;
+      color: #2c3f7a;
+      border-radius: 8px;
+      padding: 10px 12px;
+      font-size: 13px;
+      line-height: 1.45;
+      margin: 0 0 14px;
+    }
     input {
       width: 100%;
       box-sizing: border-box;
@@ -62,6 +72,9 @@
   <div class="card">
     <h1>Protected Access</h1>
     <p>Please enter the SIOP community password to continue.</p>
+    <div class="hint">
+      Need the password? Open the SIOP App -> Community -> search <strong>"Notes Sharing Tool"</strong>.
+    </div>
     <form id="login-form">
       <input id="password" type="password" placeholder="Enter password" required />
       <button id="submit-btn" type="submit">Enter site</button>
