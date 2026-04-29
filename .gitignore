@@ -1,0 +1,19 @@
+# Environment variables — never commit these
+.env
+.env.local
+.env.production
+
+# Node
+node_modules/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Editor
+.vscode/
+.idea/
+
+# Vercel
+.vercel/
+.vercel

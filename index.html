@@ -1,0 +1,128 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>SIOP 2026 — Conference Notes Hub</title>
+  <link rel="stylesheet" href="styles.css" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600&family=DM+Serif+Display&display=swap" rel="stylesheet" />
+</head>
+<body>
+  <div class="app">
+
+    <header class="header">
+      <p class="eyebrow">SIOP 2026 · New Orleans</p>
+      <h1>Conference Notes Hub</h1>
+      <p class="subtitle">A collective knowledge base — contribute notes from sessions you attended, browse what others shared.</p>
+    </header>
+
+    <div class="tab-bar">
+      <button class="tab active" data-tab="contribute">Contribute notes</button>
+      <button class="tab" data-tab="browse">Browse & download</button>
+    </div>
+
+    <div class="community-note">
+      <div class="community-note-title">Community Safety Notice</div>
+      <p>
+        This is a professional public space for sharing SIOP-relevant learning. Text and file uploads are reviewed to
+        reduce malicious or unprofessional content. Please share responsibly and report anything concerning.
+      </p>
+    </div>
+
+    <!-- CONTRIBUTE TAB -->
+    <div id="tab-contribute" class="tab-content">
+      <div class="card">
+
+        <div class="step-row">
+          <div class="step-num">1</div>
+          <div class="step-body">
+            <div class="label">Session</div>
+            <div class="search-wrap">
+              <input type="text" id="session-search" placeholder="Search by session name, ID, or presenter..." autocomplete="off" />
+              <div class="dropdown hidden" id="session-dd"></div>
+            </div>
+            <div id="sel-display" class="hidden"></div>
+          </div>
+        </div>
+
+        <div class="step-row">
+          <div class="step-num">2</div>
+          <div class="step-body">
+            <div class="label">Your notes</div>
+            <textarea id="note-text" placeholder="Share key takeaways, insights, quotes, resources — anything useful for colleagues who couldn't attend..."></textarea>
+          </div>
+        </div>
+
+        <div class="step-row">
+          <div class="step-num">3</div>
+          <div class="step-body">
+            <div class="label">Attach a file <span class="optional">(optional)</span></div>
+            <div class="upload-zone" id="upload-zone">
+              <p>Click or drag and drop a file here</p>
+              <p class="types">PDF, images, Word docs supported</p>
+            </div>
+            <input type="file" id="file-input" class="hidden" accept=".pdf,.png,.jpg,.jpeg,.gif,.docx" />
+            <div id="file-prev" class="hidden"></div>
+          </div>
+        </div>
+
+        <button class="btn-primary" id="submit-btn">Submit notes</button>
+        <div id="submit-feedback"></div>
+      </div>
+    </div>
+
+    <!-- BROWSE TAB -->
+    <div id="tab-browse" class="tab-content hidden">
+      <div class="browse-controls">
+        <input type="text" id="browse-search" placeholder="Search sessions, presenters, topics..." />
+        <div class="filters">
+          <select id="f-day">
+            <option value="">All days</option>
+            <option>Thursday, April 30</option>
+            <option>Friday, May 1</option>
+            <option>Saturday, May 2</option>
+          </select>
+          <select id="f-track">
+            <option value="">All tracks</option>
+            <option>TECHNOLOGY/ARTIFICIAL INTELLIGENCE</option>
+            <option>SELECTION/ASSESSMENT/INDIVIDUAL DIFFERENCES</option>
+            <option>LEADERSHIP/LEADER DEVELOPMENT</option>
+            <option>ORGANIZATIONAL PROCESSES/DEVELOPMENT/CULTURE</option>
+            <option>DIVERSITY, EQUITY, INCLUSION, AND ACCESSIBILITY</option>
+            <option>OCCUPATIONAL HEALTH/WORK AND FAMILY</option>
+            <option>RESEARCH METHODS/MEASUREMENT/STATISTICS</option>
+            <option>TRAINING/COACHING/MENTORING</option>
+            <option>MOTIVATION, ATTITUDES, AND EMOTIONS</option>
+            <option>GROUPS/TEAMS</option>
+            <option>I-O PSYCHOLOGIST CAREER DEVELOPMENT/TEACHING</option>
+            <option>LEGAL/ETHICAL/CURRENT EVENTS/HUMANITARIAN/PRO-SOCIAL</option>
+            <option>JOB PERFORMANCE/WITHDRAWAL/MISBEHAVIOR</option>
+          </select>
+          <select id="f-notes">
+            <option value="">All sessions</option>
+            <option value="has-notes">Has notes only</option>
+          </select>
+        </div>
+      </div>
+      <div id="browse-list"><div class="loading">Loading sessions...</div></div>
+    </div>
+
+    <div class="support-card">
+      <div>
+        <div class="support-title">Need to report a concern or issue?</div>
+        <p class="support-subtitle">Submit a ticket directly by email.</p>
+      </div>
+      <a class="support-btn" href="mailto:siopnotessharing@gmail.com?subject=SIOP%20Notes%20Hub%20Issue%20Report">Report concern</a>
+    </div>
+
+    <footer class="app-footer">
+      Produced and Managed by Charlotte Zhang
+    </footer>
+
+  </div>
+
+  <script src="config.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>

@@ -1,0 +1,5 @@
+{
+  "buildCommand": "node inject-config.js",
+  "outputDirectory": ".",
+  "installCommand": "npm install"
+}

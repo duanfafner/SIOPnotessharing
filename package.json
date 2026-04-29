@@ -1,0 +1,21 @@
+{
+  "name": "siop-2026-notes-hub",
+  "version": "1.0.0",
+  "description": "SIOP 2026 Annual Conference — Collaborative Notes Hub",
+  "scripts": {
+    "build": "node inject-config.js",
+    "dev": "node inject-config.js && npx serve .",
+    "dev:vercel": "node inject-config.js && npx vercel dev --yes",
+    "dev:static": "node inject-config.js && npx serve ."
+  },
+  "dependencies": {
+    "jszip": "^3.10.1",
+    "mammoth": "^1.12.0",
+    "pdf-lib": "^1.17.1",
+    "pdf-parse": "^2.4.5"
+  },
+  "devDependencies": {
+    "serve": "^14.0.0",
+    "yarn": "^1.22.22"
+  }
+}
