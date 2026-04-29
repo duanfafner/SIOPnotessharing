@@ -25,9 +25,9 @@ module.exports = async function handler(req, res) {
   const maxAge = 60 * 60 * 24 * 7; // 7 days
   const isProd = process.env.NODE_ENV === 'production';
   const secureFlag = isProd ? '; Secure' : '';
-  res.setHeader(
-    'Set-Cookie',
-    `siop_access=${sitePassword}; Path=/; HttpOnly; SameSite=Lax; Max-Age=${maxAge}${secureFlag}`
-  );
+  res.setHeader('Set-Cookie', [
+    `siop_access=${sitePassword}; Path=/; HttpOnly; SameSite=Lax; Max-Age=${maxAge}${secureFlag}`,
+    `siop_access_client=1; Path=/; SameSite=Lax; Max-Age=${maxAge}${secureFlag}`,
+  ]);
   return res.status(200).json({ ok: true });
 };

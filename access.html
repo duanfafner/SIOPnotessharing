@@ -70,8 +70,12 @@
   </div>
 
   <script>
+    const hasClientAccess = document.cookie.split(';').some((c) => c.trim().startsWith('siop_access_client=1'));
     const params = new URLSearchParams(window.location.search);
     const nextPath = params.get('next') || '/';
+    if (hasClientAccess) {
+      window.location.href = nextPath;
+    }
     if (params.get('error') === 'not_configured') {
       document.getElementById('error').textContent = 'Site password is not configured yet. Contact organizer.';
     }
