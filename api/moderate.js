@@ -1,3 +1,5 @@
+const { buildTextModerationPrompt, parseModerationResponse } = require('./moderation-shared');
+
 module.exports = async function handler(req, res) {
   if (req.method !== 'POST') {
     return res.status(405).json({ error: 'Method not allowed' });
@@ -13,19 +15,7 @@ module.exports = async function handler(req, res) {
     return res.status(400).json({ error: 'Missing text' });
   }
 
-  const prompt = `You are moderating content for the SIOP 2026 Annual Conference notes hub - a professional I-O psychology academic conference.
-
-Legitimate topics include: workplace psychology, AI in assessment, DEI research, leadership, selection and assessment, performance management, well-being, statistics, coaching, mentoring, HR tech, and related academic/practitioner content.
-
-Content to review:
-"${text}"
-
-Is this appropriate for a professional academic conference platform?
-
-REJECT if it contains: profanity, sexual content, hate speech, spam, personal attacks, or content completely unrelated to work/psychology.
-APPROVE if it is professional, relevant, or even tangentially related to the conference themes.
-
-Respond ONLY with valid JSON (no markdown): {"pass": true, "reason": ""} or {"pass": false, "reason": "brief reason"}`;
+  const prompt = buildTextModerationPrompt(text);
 
   try {
     const response = await fetch('https://api.anthropic.com/v1/messages', {
@@ -48,11 +38,11 @@ Respond ONLY with valid JSON (no markdown): {"pass": true, "reason": ""} or {"pa
     }
 
     const data = await response.json();
-    const raw = data?.content?.[0]?.text || '{"pass":true,"reason":""}';
-    const parsed = JSON.parse(raw.replace(/```json|```/g, '').trim());
+    const raw = data?.content?.[0]?.text;
+    const parsed = parseModerationResponse(raw);
     return res.status(200).json({
-      pass: Boolean(parsed?.pass),
-      reason: parsed?.reason || '',
+      pass: parsed.pass,
+      reason: parsed.reason,
     });
   } catch (error) {
     return res.status(500).json({ error: 'Moderation service error' });

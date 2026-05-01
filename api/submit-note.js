@@ -1,4 +1,9 @@
 const fs = require('fs');
+const {
+  buildTextModerationPrompt,
+  ATTACHMENT_MODERATION_PROMPT,
+  parseModerationResponse,
+} = require('./moderation-shared');
 
 function readLocalEnvFile() {
   const out = {};
@@ -28,19 +33,7 @@ function readCookie(req, name) {
 }
 
 async function moderateTextWithClaude(text, anthropicKey, model) {
-  const prompt = `You are moderating content for the SIOP 2026 Annual Conference notes hub - a professional I-O psychology academic conference.
-
-Legitimate topics include: workplace psychology, AI in assessment, DEI research, leadership, selection and assessment, performance management, well-being, statistics, coaching, mentoring, HR tech, and related academic/practitioner content.
-
-Content to review:
-"${text}"
-
-Is this appropriate for a professional academic conference platform?
-
-REJECT if it contains: profanity, sexual content, hate speech, spam, personal attacks, or content completely unrelated to work/psychology.
-APPROVE if it is professional, relevant, or even tangentially related to the conference themes.
-
-Respond ONLY with valid JSON (no markdown): {"pass": true, "reason": ""} or {"pass": false, "reason": "brief reason"}`;
+  const prompt = buildTextModerationPrompt(text);
 
   const response = await fetch('https://api.anthropic.com/v1/messages', {
     method: 'POST',
@@ -61,9 +54,8 @@ Respond ONLY with valid JSON (no markdown): {"pass": true, "reason": ""} or {"pa
   }
 
   const data = await response.json();
-  const raw = data?.content?.[0]?.text || '{"pass":true,"reason":""}';
-  const parsed = JSON.parse(raw.replace(/```json|```/g, '').trim());
-  return { pass: Boolean(parsed?.pass), reason: parsed?.reason || '' };
+  const raw = data?.content?.[0]?.text;
+  return parseModerationResponse(raw);
 }
 
 function getFileExtension(fileName) {
@@ -106,12 +98,7 @@ async function prepareImageBufferForModeration(fileBuffer, mediaType) {
 }
 
 async function moderateAttachmentWithClaude(fileBuffer, mediaType, anthropicKey, model) {
-  const prompt = `You are moderating an uploaded file for the SIOP 2026 Annual Conference notes hub, a professional I-O psychology platform.
-
-REJECT if it contains profanity, sexual content, hate speech, spam, personal attacks, or clearly unrelated/unprofessional content.
-APPROVE if it is professional and reasonably related to conference content.
-
-Respond ONLY with valid JSON (no markdown): {"pass": true, "reason": ""} or {"pass": false, "reason": "brief reason"}`;
+  const prompt = ATTACHMENT_MODERATION_PROMPT;
 
   const source = {
     type: 'base64',
@@ -132,7 +119,7 @@ Respond ONLY with valid JSON (no markdown): {"pass": true, "reason": ""} or {"pa
     },
     body: JSON.stringify({
       model,
-      max_tokens: 120,
+      max_tokens: 180,
       messages: [{ role: 'user', content }],
     }),
   });
@@ -141,9 +128,8 @@ Respond ONLY with valid JSON (no markdown): {"pass": true, "reason": ""} or {"pa
     throw new Error(`Attachment moderation API failed: ${response.status}`);
   }
   const data = await response.json();
-  const raw = data?.content?.[0]?.text || '{"pass":true,"reason":""}';
-  const parsed = JSON.parse(raw.replace(/```json|```/g, '').trim());
-  return { pass: Boolean(parsed?.pass), reason: parsed?.reason || '' };
+  const raw = data?.content?.[0]?.text;
+  return parseModerationResponse(raw);
 }
 
 
