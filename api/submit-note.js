@@ -109,18 +109,138 @@ async function prepareImageBufferForModeration(fileBuffer, mediaType) {
   }
 }
 
-async function moderateAttachmentWithClaude(fileBuffer, mediaType, anthropicKey, model) {
-  const prompt = ATTACHMENT_MODERATION_PROMPT;
+async function moderateDocxViaExtractedText(docxBuffer, anthropicKey, moderationModel) {
+  const mammoth = require('mammoth');
+  let text = '';
+  try {
+    const result = await mammoth.extractRawText({ buffer: docxBuffer });
+    text = (result.value || '').trim();
+  } catch (e) {
+    console.error('mammoth moderation extract', e);
+    return { pass: false, reason: 'Could not read this Word document for moderation.' };
+  }
+  if (text.length < 40) {
+    return {
+      pass: false,
+      reason: 'Very little text in this document; add context in the text box or try a PDF.',
+    };
+  }
+  const max = 100000;
+  const sample =
+    text.length > max ? `${text.slice(0, max)}\n\n[… excerpt truncated for moderation …]` : text;
+  const wrapped = `[Moderation: extracted text from uploaded Word file for SIOP notes hub]\n\n${sample}`;
+  return moderateTextWithClaude(wrapped, anthropicKey, moderationModel);
+}
 
-  const source = {
-    type: 'base64',
-    media_type: mediaType,
-    data: fileBuffer.toString('base64'),
+async function moderatePdfViaExtractedText(pdfBuffer, anthropicKey, moderationModel) {
+  const { PDFParse } = require('pdf-parse');
+  let parser;
+  let text = '';
+  try {
+    parser = new PDFParse({ data: pdfBuffer });
+    const result = await parser.getText({ first: 100 });
+    text = (result.text || '').trim();
+  } catch (e) {
+    console.error('pdf-parse moderation', e);
+    return {
+      pass: false,
+      reason:
+        'Could not read this PDF for moderation. Try fewer pages, re-export as PDF, or split the file.',
+    };
+  } finally {
+    try {
+      if (parser && typeof parser.destroy === 'function') await parser.destroy();
+    } catch {}
+  }
+  if (text.length < 80) {
+    return {
+      pass: false,
+      reason:
+        'This PDF has almost no extractable text (it may be mostly slides-as-images). Try exporting with selectable text or fewer pages.',
+    };
+  }
+  const max = 100000;
+  const sample =
+    text.length > max ? `${text.slice(0, max)}\n\n[… excerpt truncated for moderation …]` : text;
+  const wrapped = `[Moderation: extracted text from the first pages of an uploaded PDF]\n\n${sample}`;
+  return moderateTextWithClaude(wrapped, anthropicKey, moderationModel);
+}
+
+/**
+ * PDF: Prefer public URL (tiny JSON; Anthropic fetches the file). Vision often 400s on long slide decks
+ * (page/token limits), not because of file size — a 5–6 MB “combined slides” PDF can still exceed limits.
+ * Fallback: base64 vision, then first-pages text (reliable for big decks).
+ */
+async function moderatePdfAttachment(fileBuffer, anthropicKey, moderationModel, publicFileUrl) {
+  const tryVision = async (useUrl) => {
+    return moderateAttachmentWithClaude(
+      fileBuffer,
+      'application/pdf',
+      anthropicKey,
+      moderationModel,
+      useUrl ? publicFileUrl : null
+    );
   };
 
-  const content = mediaType.startsWith('image/')
-    ? [{ type: 'image', source }, { type: 'text', text: prompt }]
-    : [{ type: 'document', source }, { type: 'text', text: prompt }];
+  const bytes = fileBuffer.length;
+  /** Above ~3 MB, a second full-PDF vision call (base64) usually repeats the same 400 as URL vision. */
+  const largeDeck = bytes >= 3 * 1024 * 1024;
+
+  if (publicFileUrl && /^https?:\/\//i.test(publicFileUrl)) {
+    try {
+      return await tryVision(true);
+    } catch (e) {
+      if (e.statusCode !== 400 && e.statusCode !== 413) throw e;
+      console.error('PDF moderation (URL) failed:', e.detail || e.message);
+      const detail = String(e.detail || '').toLowerCase();
+      const urlFetchProblem =
+        /unable to fetch|could not fetch|failed to download|fetch.*pdf|invalid.*url|retrieve.*document/.test(
+          detail
+        );
+      if (largeDeck && !urlFetchProblem) {
+        console.error(
+          'PDF (~%s MB): skipping base64 vision; using text sample (large slide decks often exceed vision page limits).',
+          (bytes / (1024 * 1024)).toFixed(1)
+        );
+        return moderatePdfViaExtractedText(fileBuffer, anthropicKey, moderationModel);
+      }
+    }
+  }
+  try {
+    return await tryVision(false);
+  } catch (e) {
+    if (e.statusCode !== 400 && e.statusCode !== 413) throw e;
+    console.error('PDF moderation (base64) failed:', e.detail || e.message);
+    return moderatePdfViaExtractedText(fileBuffer, anthropicKey, moderationModel);
+  }
+}
+
+async function moderateAttachmentWithClaude(fileBuffer, mediaType, anthropicKey, model, publicFileUrl) {
+  const prompt = ATTACHMENT_MODERATION_PROMPT;
+
+  let content;
+  if (mediaType === 'application/pdf' && publicFileUrl && /^https?:\/\//i.test(publicFileUrl)) {
+    content = [
+      { type: 'document', source: { type: 'url', url: publicFileUrl } },
+      { type: 'text', text: prompt },
+    ];
+  } else if (mediaType.startsWith('image/')) {
+    const source = {
+      type: 'base64',
+      media_type: mediaType,
+      data: fileBuffer.toString('base64'),
+    };
+    content = [{ type: 'image', source }, { type: 'text', text: prompt }];
+  } else if (mediaType === 'application/pdf') {
+    const source = {
+      type: 'base64',
+      media_type: mediaType,
+      data: fileBuffer.toString('base64'),
+    };
+    content = [{ type: 'document', source }, { type: 'text', text: prompt }];
+  } else {
+    throw new Error(`Unsupported media type for Claude document API: ${mediaType}`);
+  }
 
   const response = await fetch('https://api.anthropic.com/v1/messages', {
     method: 'POST',
@@ -137,7 +257,17 @@ async function moderateAttachmentWithClaude(fileBuffer, mediaType, anthropicKey,
   });
 
   if (!response.ok) {
-    throw new Error(`Attachment moderation API failed: ${response.status}`);
+    const errText = await response.text();
+    let detail = errText;
+    try {
+      const j = JSON.parse(errText);
+      detail = j?.error?.message || errText;
+    } catch {}
+    const err = new Error(`Attachment moderation API failed: ${response.status}`);
+    err.statusCode = response.status;
+    err.detail = detail;
+    err.responseBody = errText;
+    throw err;
   }
   const data = await response.json();
   const raw = data?.content?.[0]?.text;
@@ -200,21 +330,46 @@ module.exports = async function handler(req, res) {
       }
 
       const fileBuffer = Buffer.from(await fileRes.arrayBuffer());
-      const imageModel = resolveImageModerationModel(
-        process.env.ANTHROPIC_MODEL_IMAGE_MODERATION,
-        localEnv.ANTHROPIC_MODEL_IMAGE_MODERATION
-      );
-      const modelForAttachment = mediaType.startsWith('image/') ? imageModel : moderationModel;
-      const { buffer: modBuffer, mediaType: modMediaType } = await prepareImageBufferForModeration(
-        fileBuffer,
-        mediaType
-      );
-      const fileModeration = await moderateAttachmentWithClaude(
-        modBuffer,
-        modMediaType,
-        anthropicKey,
-        modelForAttachment
-      );
+
+      let fileModeration;
+      if (mediaType === 'application/vnd.openxmlformats-officedocument.wordprocessingml.document') {
+        fileModeration = await moderateDocxViaExtractedText(fileBuffer, anthropicKey, moderationModel);
+      } else if (mediaType === 'application/pdf') {
+        try {
+          fileModeration = await moderatePdfAttachment(fileBuffer, anthropicKey, moderationModel, fileUrl);
+        } catch (err) {
+          const hint = (err.detail || err.message || '').slice(0, 600);
+          console.error('PDF moderation error', err.responseBody || err);
+          return res.status(500).json({
+            error: `Submission moderation failed: ${hint || err.message}`,
+          });
+        }
+      } else {
+        const imageModel = resolveImageModerationModel(
+          process.env.ANTHROPIC_MODEL_IMAGE_MODERATION,
+          localEnv.ANTHROPIC_MODEL_IMAGE_MODERATION
+        );
+        const modelForAttachment = mediaType.startsWith('image/') ? imageModel : moderationModel;
+        const { buffer: modBuffer, mediaType: modMediaType } = await prepareImageBufferForModeration(
+          fileBuffer,
+          mediaType
+        );
+        try {
+          fileModeration = await moderateAttachmentWithClaude(
+            modBuffer,
+            modMediaType,
+            anthropicKey,
+            modelForAttachment,
+            null
+          );
+        } catch (err) {
+          const hint = (err.detail || err.message || '').slice(0, 600);
+          console.error('Attachment moderation error', err.responseBody || err);
+          return res.status(500).json({
+            error: `Submission moderation failed: ${hint || err.message}`,
+          });
+        }
+      }
       if (!fileModeration.pass) {
         return res.status(200).json({
           pass: false,
