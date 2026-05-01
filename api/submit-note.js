@@ -133,6 +133,17 @@ async function moderateDocxViaExtractedText(docxBuffer, anthropicKey, moderation
 }
 
 async function moderatePdfViaExtractedText(pdfBuffer, anthropicKey, moderationModel) {
+  // pdf-parse v2 bundles PDF.js; Node needs DOMMatrix etc. from the worker entry (uses @napi-rs/canvas).
+  try {
+    require('pdf-parse/worker');
+  } catch (e) {
+    console.error('pdf-parse/worker preload failed', e);
+    return {
+      pass: false,
+      reason:
+        'Could not initialize PDF text extraction on the server. Try re-exporting the PDF or splitting the file.',
+    };
+  }
   const { PDFParse } = require('pdf-parse');
   let parser;
   let text = '';
