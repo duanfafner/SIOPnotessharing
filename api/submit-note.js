@@ -80,6 +80,31 @@ function getAttachmentMediaType(fileName) {
   return '';
 }
 
+/** Smaller images = faster Claude vision calls; full file stays in Storage. */
+async function prepareImageBufferForModeration(fileBuffer, mediaType) {
+  if (!mediaType.startsWith('image/')) {
+    return { buffer: fileBuffer, mediaType };
+  }
+  let sharp;
+  try {
+    sharp = require('sharp');
+  } catch {
+    return { buffer: fileBuffer, mediaType };
+  }
+  try {
+    const maxSide = 1280;
+    const out = await sharp(fileBuffer, { animated: false, pages: 1 })
+      .rotate()
+      .resize(maxSide, maxSide, { fit: 'inside', withoutEnlargement: true })
+      .jpeg({ quality: 85, mozjpeg: true })
+      .toBuffer();
+    return { buffer: out, mediaType: 'image/jpeg' };
+  } catch (e) {
+    console.error('prepareImageBufferForModeration', e);
+    return { buffer: fileBuffer, mediaType };
+  }
+}
+
 async function moderateAttachmentWithClaude(fileBuffer, mediaType, anthropicKey, model) {
   const prompt = `You are moderating an uploaded file for the SIOP 2026 Annual Conference notes hub, a professional I-O psychology platform.
 
@@ -177,11 +202,21 @@ module.exports = async function handler(req, res) {
       }
 
       const fileBuffer = Buffer.from(await fileRes.arrayBuffer());
-      const fileModeration = await moderateAttachmentWithClaude(
+      const defaultImageModerationModel = 'claude-3-5-haiku-20241022';
+      const imageModel =
+        process.env.ANTHROPIC_MODEL_IMAGE_MODERATION ||
+        localEnv.ANTHROPIC_MODEL_IMAGE_MODERATION ||
+        defaultImageModerationModel;
+      const modelForAttachment = mediaType.startsWith('image/') ? imageModel : moderationModel;
+      const { buffer: modBuffer, mediaType: modMediaType } = await prepareImageBufferForModeration(
         fileBuffer,
-        mediaType,
+        mediaType
+      );
+      const fileModeration = await moderateAttachmentWithClaude(
+        modBuffer,
+        modMediaType,
         anthropicKey,
-        moderationModel
+        modelForAttachment
       );
       if (!fileModeration.pass) {
         return res.status(200).json({

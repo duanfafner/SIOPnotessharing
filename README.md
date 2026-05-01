@@ -7,7 +7,7 @@ A collaborative, community-driven notes platform for the SIOP 2026 Annual Confer
 ## Features
 
 - **Contribute notes** — search sessions by name, ID, or presenter, type free-form notes, and optionally attach a PDF, image, or Word DOCX file
-- **AI moderation** — every submission is reviewed by Claude Sonnet before saving to ensure professional, on-topic content
+- **AI moderation** — text and PDF/DOCX attachments use your configured Sonnet (or other) model; **image** attachments are checked with **Claude Haiku** by default for speed and cost (overridable via env)
 - **Browse & filter** — filter by day, track, or keyword; toggle "has notes only" to find the most active sessions
 - **Download summaries** — download a compiled PDF summary of approved notes for any session, including embedded image attachments
 - **Auto large-session package** — when a session is very large, downloads automatically switch to a ZIP package for faster delivery
@@ -22,7 +22,7 @@ A collaborative, community-driven notes platform for the SIOP 2026 Annual Confer
 | Frontend | Vanilla HTML, CSS, JS (no framework, no build step) |
 | Database | Supabase (Postgres) |
 | File storage | Supabase Storage |
-| Moderation | Anthropic Claude Sonnet API |
+| Moderation | Anthropic Claude API (Sonnet for text/docs; Haiku default for image attachments) |
 | PDF generation | `pdf-lib` via Vercel API route |
 | Document extraction | `pdf-parse` (PDF), `mammoth` (DOCX) |
 | Packaging | `jszip` for large-session ZIP downloads |
@@ -72,6 +72,7 @@ SUPABASE_KEY=sb_publishable_TgoHH_kM8jPaqekxwoWGgw_vYWW94PX
 ANTHROPIC_KEY=your_anthropic_api_key
 SUPABASE_SERVICE_ROLE_KEY=your_supabase_service_role_key
 ANTHROPIC_MODEL_MODERATION=claude-sonnet-4-20250514
+ANTHROPIC_MODEL_IMAGE_MODERATION=claude-3-5-haiku-20241022
 ANTHROPIC_MODEL_OCR=claude-sonnet-4-20250514
 ```
 
@@ -125,6 +126,7 @@ In your Vercel project → **Settings → Environment Variables**, add:
 | `ANTHROPIC_KEY` | `your_anthropic_api_key` |
 | `SUPABASE_SERVICE_ROLE_KEY` | `your_service_role_key` |
 | `ANTHROPIC_MODEL_MODERATION` | `claude-sonnet-4-20250514` |
+| `ANTHROPIC_MODEL_IMAGE_MODERATION` | `claude-3-5-haiku-20241022` (optional; this is the default in code if omitted) |
 | `ANTHROPIC_MODEL_OCR` | `claude-sonnet-4-20250514` |
 | `DOWNLOAD_ZIP_THRESHOLD` | `80` |
 | `SITE_PASSWORD` | `shared SIOP access password` |

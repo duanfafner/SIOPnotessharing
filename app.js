@@ -66,12 +66,28 @@ function populateBrowseFilters() {
 async function loadNotes() {
   try {
     NOTES = await sbFetch(
-      'notes?select=*&moderation_status=eq.approved&order=created_at.desc'
+      'notes?select=*&moderation_status=eq.approved&order=created_at.desc&limit=10000'
     );
     if (!Array.isArray(NOTES)) NOTES = [];
   } catch (e) {
     NOTES = [];
   }
+  renderCelebrationMetrics();
+}
+
+function renderCelebrationMetrics() {
+  const sessionsEl = document.getElementById('metric-sessions');
+  const notesEl = document.getElementById('metric-notes');
+  if (!sessionsEl || !notesEl) return;
+
+  const noteCount = NOTES.length;
+  const sessionIds = new Set(
+    NOTES.map((n) => n.session_id).filter((id) => id != null && id !== '')
+  );
+  const sessionCount = sessionIds.size;
+
+  sessionsEl.textContent = String(sessionCount);
+  notesEl.textContent = String(noteCount);
 }
 
 // ── Event bindings ───────────────────────────
@@ -275,11 +291,14 @@ async function submitNote() {
     // 1. Build submission payloads (one note per attached file; text on first one)
     const submissions = [];
     if (selectedFiles.length) {
+      showFeedback('loading', `Uploading ${selectedFiles.length} file${selectedFiles.length === 1 ? '' : 's'}…`);
+      const uploads = await Promise.all(
+        selectedFiles.map((file, i) => uploadFile(file, i))
+      );
       for (let i = 0; i < selectedFiles.length; i++) {
-        const file = selectedFiles[i];
-        const upload = await uploadFile(file);
+        const upload = uploads[i];
         if (!upload) {
-          showFeedback('error', `Upload failed for ${file.name}. Please try again.`);
+          showFeedback('error', `Upload failed for ${selectedFiles[i].name}. Please try again.`);
           btn.disabled = false;
           return;
         }
@@ -299,26 +318,33 @@ async function submitNote() {
       });
     }
 
-    // 2. Submit each payload through server-side moderation route
-    for (const item of submissions) {
-      const submitRes = await fetch('/api/submit-note', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          sessionId: selectedSession.session_id,
-          text: item.text,
-          fileUrl: item.fileUrl,
-          fileName: item.fileName,
-          fileType: item.fileType,
-        }),
-      });
-      const submitData = await submitRes.json().catch(() => ({}));
-      if (!submitRes.ok || submitData?.pass === false) {
-        const reason = submitData?.reason || submitData?.error || 'Submission failed moderation.';
-        showFeedback('error', `Submission not accepted: ${reason}`);
-        btn.disabled = false;
-        return;
-      }
+    // 2. Moderation + save (parallel per attachment for much faster multi-image submits)
+    showFeedback('loading', 'Checking content and saving…');
+    const submitResults = await Promise.all(
+      submissions.map((item) =>
+        fetch('/api/submit-note', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            sessionId: selectedSession.session_id,
+            text: item.text,
+            fileUrl: item.fileUrl,
+            fileName: item.fileName,
+            fileType: item.fileType,
+          }),
+        }).then(async (r) => {
+          const data = await r.json().catch(() => ({}));
+          return { ok: r.ok && data?.pass !== false, data, item };
+        })
+      )
+    );
+    const failed = submitResults.find((r) => !r.ok);
+    if (failed) {
+      const reason = failed.data?.reason || failed.data?.error || 'Submission failed moderation.';
+      const filePart = failed.item?.fileName ? ` (${failed.item.fileName})` : '';
+      showFeedback('error', `Submission not accepted${filePart}: ${reason}`);
+      btn.disabled = false;
+      return;
     }
 
     // 4. Reset form
@@ -340,11 +366,11 @@ async function submitNote() {
 }
 
 // ── File upload to Supabase Storage ──────────
-async function uploadFile(file) {
+async function uploadFile(file, index = 0) {
   try {
     const ext = file.name.split('.').pop();
     const safeName = file.name.replace(/[^a-zA-Z0-9._-]/g, '_');
-    const path = `notes/${Date.now()}_${safeName}`;
+    const path = `notes/${Date.now()}_${index}_${safeName}`;
 
     const res = await fetch(
       `${CONFIG.SUPABASE_URL}/storage/v1/object/conference-notes/${path}`,
