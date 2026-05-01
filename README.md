@@ -72,7 +72,7 @@ SUPABASE_KEY=sb_publishable_TgoHH_kM8jPaqekxwoWGgw_vYWW94PX
 ANTHROPIC_KEY=your_anthropic_api_key
 SUPABASE_SERVICE_ROLE_KEY=your_supabase_service_role_key
 ANTHROPIC_MODEL_MODERATION=claude-sonnet-4-20250514
-ANTHROPIC_MODEL_IMAGE_MODERATION=claude-3-5-haiku-20241022
+ANTHROPIC_MODEL_IMAGE_MODERATION=claude-haiku-4-5
 ANTHROPIC_MODEL_OCR=claude-sonnet-4-20250514
 ```
 
@@ -126,7 +126,7 @@ In your Vercel project → **Settings → Environment Variables**, add:
 | `ANTHROPIC_KEY` | `your_anthropic_api_key` |
 | `SUPABASE_SERVICE_ROLE_KEY` | `your_service_role_key` |
 | `ANTHROPIC_MODEL_MODERATION` | `claude-sonnet-4-20250514` |
-| `ANTHROPIC_MODEL_IMAGE_MODERATION` | `claude-3-5-haiku-20241022` (optional; this is the default in code if omitted) |
+| `ANTHROPIC_MODEL_IMAGE_MODERATION` | `claude-haiku-4-5` (optional; default in code if omitted) |
 | `ANTHROPIC_MODEL_OCR` | `claude-sonnet-4-20250514` |
 | `DOWNLOAD_ZIP_THRESHOLD` | `80` |
 | `SITE_PASSWORD` | `shared SIOP access password` |

@@ -5,6 +5,18 @@ const {
   parseModerationResponse,
 } = require('./moderation-shared');
 
+/** Older Haiku IDs (e.g. claude-3-5-haiku-20241022) return 404 on the current Messages API. */
+function resolveImageModerationModel(fromEnv, fromLocal) {
+  const raw = (fromEnv || fromLocal || '').trim();
+  const legacy =
+    /^claude-3-5-haiku/i.test(raw) ||
+    /^claude-3-haiku/i.test(raw) ||
+    raw === 'claude-haiku-3-5-20241022';
+  if (legacy) return 'claude-haiku-4-5';
+  if (raw) return raw;
+  return 'claude-haiku-4-5';
+}
+
 function readLocalEnvFile() {
   const out = {};
   try {
@@ -188,11 +200,10 @@ module.exports = async function handler(req, res) {
       }
 
       const fileBuffer = Buffer.from(await fileRes.arrayBuffer());
-      const defaultImageModerationModel = 'claude-3-5-haiku-20241022';
-      const imageModel =
-        process.env.ANTHROPIC_MODEL_IMAGE_MODERATION ||
-        localEnv.ANTHROPIC_MODEL_IMAGE_MODERATION ||
-        defaultImageModerationModel;
+      const imageModel = resolveImageModerationModel(
+        process.env.ANTHROPIC_MODEL_IMAGE_MODERATION,
+        localEnv.ANTHROPIC_MODEL_IMAGE_MODERATION
+      );
       const modelForAttachment = mediaType.startsWith('image/') ? imageModel : moderationModel;
       const { buffer: modBuffer, mediaType: modMediaType } = await prepareImageBufferForModeration(
         fileBuffer,
