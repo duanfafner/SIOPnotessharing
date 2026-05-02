@@ -35,15 +35,6 @@ function readLocalEnvFile() {
   return out;
 }
 
-function readCookie(req, name) {
-  const raw = req.headers.cookie || '';
-  const parts = raw.split(';').map((p) => p.trim());
-  for (const part of parts) {
-    if (part.startsWith(`${name}=`)) return decodeURIComponent(part.slice(name.length + 1));
-  }
-  return '';
-}
-
 async function moderateTextWithClaude(text, anthropicKey, model) {
   const prompt = buildTextModerationPrompt(text);
 
@@ -292,13 +283,6 @@ module.exports = async function handler(req, res) {
   }
 
   const localEnv = readLocalEnvFile();
-  const sitePassword = process.env.SITE_PASSWORD || localEnv.SITE_PASSWORD || '';
-  if (sitePassword) {
-    const cookieVal = readCookie(req, 'siop_access');
-    if (cookieVal !== sitePassword) {
-      return res.status(401).json({ error: 'Unauthorized' });
-    }
-  }
 
   const supabaseUrl = process.env.SUPABASE_URL || localEnv.SUPABASE_URL;
   const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY || localEnv.SUPABASE_SERVICE_ROLE_KEY;

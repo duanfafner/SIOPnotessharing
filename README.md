@@ -129,7 +129,6 @@ In your Vercel project → **Settings → Environment Variables**, add:
 | `ANTHROPIC_MODEL_IMAGE_MODERATION` | `claude-haiku-4-5` (optional; default in code if omitted) |
 | `ANTHROPIC_MODEL_OCR` | `claude-sonnet-4-20250514` |
 | `DOWNLOAD_ZIP_THRESHOLD` | `80` |
-| `SITE_PASSWORD` | `shared SIOP access password` |
 
 ### Step 4 — Deploy
 
