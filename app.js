@@ -278,10 +278,11 @@ function clearFile() {
 
 // ── Submit note ──────────────────────────────
 async function submitNote() {
-  const text = document.getElementById('note-text').value.trim();
+  const textRaw = document.getElementById('note-text').value;
+  const textForValidation = textRaw.trim();
 
   if (!selectedSession) { showFeedback('error', 'Please select a session first.'); return; }
-  if (!text && !selectedFiles.length) { showFeedback('error', 'Please add some notes or attach a file.'); return; }
+  if (!textForValidation && !selectedFiles.length) { showFeedback('error', 'Please add some notes or attach a file.'); return; }
 
   const btn = document.getElementById('submit-btn');
   btn.disabled = true;
@@ -303,7 +304,7 @@ async function submitNote() {
           return;
         }
         submissions.push({
-          text: i === 0 ? text : '',
+          text: i === 0 ? textRaw : '',
           fileUrl: upload.url,
           fileName: upload.name,
           fileType: upload.type,
@@ -311,7 +312,7 @@ async function submitNote() {
       }
     } else {
       submissions.push({
-        text,
+        text: textRaw,
         fileUrl: null,
         fileName: null,
         fileType: null,
@@ -463,7 +464,7 @@ function renderBrowse() {
                         (n) => `
                 <div class="note-item">
                   <div class="note-ts">${formatDate(n.created_at)}</div>
-                  ${n.free_text ? `<div class="note-text">${n.free_text}</div>` : ''}
+                  ${n.free_text ? `<div class="note-text">${escapeHtml(n.free_text)}</div>` : ''}
                   ${n.file_url ? `<a class="note-file" href="${n.file_url}" target="_blank">📎 ${n.file_name || 'Attachment'}</a>` : ''}
                 </div>`
                       )
@@ -543,6 +544,15 @@ function formatDate(iso) {
     hour: '2-digit',
     minute: '2-digit',
   });
+}
+
+function escapeHtml(value) {
+  return String(value || '')
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
 }
 
 // ── Start ────────────────────────────────────

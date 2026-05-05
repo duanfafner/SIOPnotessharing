@@ -627,7 +627,11 @@ textarea {
   margin-bottom: 4px;
 }
 
-.note-text { color: var(--color-text); }
+.note-text {
+  color: var(--color-text);
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
 
 .note-file {
   display: inline-flex;
